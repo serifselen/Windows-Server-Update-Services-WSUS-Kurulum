@@ -22,7 +22,9 @@ Bu rehber, **Windows Server 2025 Standard Evaluation** sistemine **Windows Serve
   - [Adım 11: Microsoft Connection ve Dil Seçimi](#adım-11-microsoft-connection-ve-dil-seçimi)  
   - [Adım 12: Update Kaynakları ve İşletim Sistemleri Seçimi](#adım-12-update-kaynakları-ve-işletim-sistemleri-seçimi)  
   - [Adım 13: Update Sınıflandırmaları ve Zamanlama](#adım-13-update-sınıflandırmaları-ve-zamanlama)  
+  - [Adım 14: Update Services Arayüzü ve Ekstra Özellikler](#adım-14-update-services-arayüzü-ve-ekstra-özellikler)  
 - [Kurulum Sonrası Ekstra Özellikler](#-kurulum-sonrası-ekstra-özellikler)  
+- [Sık Karşılaşılan Sorunlar ve Çözümler](#-sık-karşılaşılan-sorunlar-ve-çözümler)  
 - [Doküman Bilgileri](#-doküman-bilgileri)  
 
 ---
@@ -271,9 +273,39 @@ Set-WsusServerSynchronization -SyncFromMU $true -UpdateSource $true
 
 ---
 
-### Adım 11: Microsoft Connection ve Dil Seçimi  
+### Adım 11: Before You Begin  
 
 ![Adım 11](Images/11.png)  
+
+**Ön Koşul Kontrolleri:**  
+1. **Güvenlik Duvarı Ayarları:**  
+   - WSUS sunucusuna erişim için 8530/8531 portları açılmalıdır
+   - İstemcilerin WSUS sunucusuna erişimi sağlanmalıdır
+   
+2. **Microsoft Update ile Bağlantı:**  
+   - Sunucunun internete erişimi olmalıdır
+   - Microsoft Update sunucularına erişim sağlanmalıdır
+   
+3. **Proxy Ayarları:**  
+   - Kurum içi proxy kullanılıyorsa doğru ayarlar yapılmalıdır
+   - Proxy için kullanıcı kimlik bilgileri gerekebilir
+
+**Teknik Doğrulama:**  
+```powershell
+# Güvenlik duvarı kuralları kontrolü
+Get-NetFirewallRule -DisplayName "WSUS" -ErrorAction SilentlyContinue
+
+# İnternet bağlantısı kontrolü
+Test-NetConnection -ComputerName "www.update.microsoft.com" -Port 443
+```
+
+✅ **Next** butonuna tıklayarak devam edin.  
+
+---
+
+### Adım 12: Microsoft Connection ve Dil Seçimi  
+
+![Adım 12](Images/12.png)  
 
 **Microsoft Connection Ayarları:**  
 - ✅ **Synchronize from Microsoft Update**  
@@ -294,9 +326,9 @@ Set-WsusServerSynchronization -Language "tr-TR" -UpdateSource $true
 
 ---
 
-### Adım 12: Update Kaynakları ve İşletim Sistemleri Seçimi  
+### Adım 13: Update Kaynakları ve İşletim Sistemleri Seçimi  
 
-![Adım 12](Images/12.png)  
+![Adım 13](Images/13.png)  
 
 **Update Kaynakları:**  
 - ✅ **Windows 10/11**  
@@ -318,9 +350,9 @@ Get-WsusProduct | Where-Object {$_.ProductTitle -like "*Windows 10/11*"} | Set-W
 
 ---
 
-### Adım 13: Update Sınıflandırmaları ve Zamanlama  
+### Adım 14: Update Sınıflandırmaları ve Zamanlama  
 
-![Adım 13](Images/13.png)  
+![Adım 14](Images/14.png)  
 
 **Update Sınıflandırmaları:**  
 - ✅ **Critical Updates**  
@@ -339,6 +371,124 @@ Set-WsusServerSynchronization -SyncFromMU $true -ScheduledSyncDay EveryDay -Sche
 ```
 
 ✅ **Finish** butonuna tıklayarak kurulumu tamamlayın.  
+
+---
+
+### Adım 15: Configure Sync Schedule
+
+![Adım 15](Images/15.png)
+
+**Senkronizasyon Zamanlaması:**  
+- **Synchronize manually**: Elle tetiklenen güncelleme  
+- **Synchronize automatically**: Otomatik senkronizasyon  
+  - **First synchronization**: İlk senkronizasyon zamanı (Örnek: `06:39:27`)  
+  - **Synchronizations per day**: Gündelik senkronizasyon sayısı (Örnek: `1`)  
+
+**Teknik Detaylar:**  
+- Otomatik senkronizasyon zamanı 30 dakika rastgele kaydırma içerir  
+- Senkronizasyon sırasında ağ trafiği artar  
+- En iyi uygulama: Gece saatlerinde senkronizasyon  
+
+**PowerShell ile Senkronizasyon Ayarları:**  
+```powershell
+# Günlük otomatik senkronizasyon
+Set-WsusServerSynchronization -SyncFromMU $true -ScheduledSyncDay EveryDay -ScheduledSyncTime 02:00 -SyncNow $false
+
+# El ile senkronizasyon
+Invoke-WsusServerSynchronization
+```
+
+✅ **Next** butonuna tıklayarak devam edin.  
+
+---
+
+### Adım 16: Choose Classifications
+
+![Adım 16](Images/16.png)
+
+**Update Sınıflandırmaları:**  
+- ✅ **Critical Updates**: Kritik güvenlik yamaları  
+- ✅ **Definition Updates**: Tanım güncellemeleri (Antivirüs)  
+- ✅ **Security Updates**: Güvenlik yamaları  
+- ✅ **Upgrades**: Sürüm yükseltmeleri  
+
+**Diğer Sınıflandırmalar:**  
+- ❌ **Driver Sets**: Sürücü güncellemeleri  
+- ❌ **Driver**: Bireysel sürücü güncellemeleri  
+- ❌ **Feature Packs**: Özellik paketleri  
+- ❌ **Service Packs**: Servis paketleri  
+- ❌ **Tools**: Araç güncellemeleri  
+- ❌ **Update Rollups**: Toplu güncellemeler  
+- ❌ **Updates**: Genel güncellemeler  
+
+**En İyi Uygulama:**  
+- Üretim ortamında sadece **Critical Updates**, **Security Updates** ve **Definition Updates** seçilmesi önerilir  
+- Test ortamında tüm güncellemeler indirilebilir  
+
+**PowerShell ile Sınıflandırma Ayarları:**  
+```powershell
+# Critical Updates etkinleştirme
+Get-WsusClassification | Where-Object {$_.ClassificationTitle -eq "Critical Updates"} | Set-WsusClassification -Enable
+
+# Security Updates etkinleştirme
+Get-WsusClassification | Where-Object {$_.ClassificationTitle -eq "Security Updates"} | Set-WsusClassification -Enable
+
+# Definition Updates etkinleştirme
+Get-WsusClassification | Where-Object {$_.ClassificationTitle -eq "Definition Updates"} | Set-WsusClassification -Enable
+```
+
+✅ **Next** butonuna tıklayarak devam edin.  
+
+---
+
+### Adım 17: Update Services Arayüzü ve Ekstra Özellikler
+
+![Adım 17](Images/17.png)
+
+**WSUS Management Console:**  
+- **Sol Paneldeki Bölümler:**  
+  - **Update Services**: Temel yönetim arayüzü  
+  - **All Updates**: Tüm güncellemelerin listesi  
+  - **Critical Updates**: Kritik güncellemeler  
+  - **Security Updates**: Güvenlik güncellemeleri  
+  - **Computers**: Sunucuya bağlı istemciler  
+  - **Downstream Servers**: Alt seviye WSUS sunucuları  
+  - **Reports**: Raporlama seçenekleri  
+  - **Options**: Genel yapılandırma ayarları  
+
+**Options (Seçenekler) Bölümleri:**  
+1. **Update Source and Proxy Server**:  
+   - Microsoft Update veya üst seviye WSUS sunucu seçimi  
+   - Proxy ayarları  
+
+2. **Products and Classifications**:  
+   - Güncellenecek ürünler ve sınıflandırmalar  
+
+3. **Update Files and Languages**:  
+   - İndirilecek diller ve dosya depolama konumu  
+
+4. **Synchronization Schedule**:  
+   - Senkronizasyon zamanlaması  
+
+5. **Automatic Approvals**:  
+   - Otomatik onay kuralları  
+
+6. **Computers**:  
+   - Bilgisayar grupları yönetimi  
+
+7. **Server Cleanup Wizard**:  
+   - Eski dosyaları temizleme aracı  
+
+8. **Reporting Rollup**:  
+   - Raporlama ayarları  
+
+**PowerShell ile Temel Yapılandırma:**  
+```powershell
+# WSUS yönetim konsolunu açma
+wsus.vbs
+```
+
+✅ Kurulum ve yapılandırma tamamlandı. WSUS sunucusu artık güncellemeleri yönetebilir durumdadır.  
 
 ---
 
@@ -364,6 +514,64 @@ Get-WsusUpdate -Approval Unapproved | Approve-WsusUpdate -Action Install -Target
 ```powershell
 # Update istatistikleri
 Get-WsusUpdateSummary | Format-Table Product, UpdateType, Approved, Installed
+```
+
+### Otomatik Onay Kuralları  
+```powershell
+# Critical Updates için otomatik onay
+$rule = New-WsusApprovalRule -Name "Critical Updates Auto-Approval" -Action Install -Product "Windows 10" -UpdateClassifications "Critical Updates"
+Set-WsusApprovalRule -Rule $rule
+```
+
+---
+
+## 🛠️ Sık Karşılaşılan Sorunlar ve Çözümler  
+
+### 1. Senkronizasyon Sorunları  
+**Belirtiler:**  
+- "The synchronization with the upstream server or Microsoft Update was canceled."  
+- Senkronizasyon tamamlanamıyor  
+
+**Çözüm:**  
+```powershell
+# WSUS veritabanı onarımı
+wsusutil.exe reset
+
+# Senkronizasyon durumunu kontrol et
+Get-WsusServer | Get-WsusUpdateServer | Get-WsusSynchronizationStatus
+
+# Senkronizasyonu manuel başlat
+Invoke-WsusServerSynchronization
+```
+
+### 2. Update İndirme Sorunları  
+**Belirtiler:**  
+- Update'ler indirilemiyor  
+- "Failed to download update" hataları  
+
+**Çözüm:**  
+```powershell
+# Update içeriğini temizle ve yeniden indir
+Get-WsusServer | Get-WsusUpdateServer | Sync-WsusServer
+
+# Update içeriği klasörünü kontrol et
+Get-WSUSServer | Get-WsusUpdateServer | Get-WsusUpdate | Where-Object {$_.IsDownloaded -eq $false} | ForEach-Object { $_.Decline() }
+```
+
+### 3. WSUS Veritabanı Sorunları  
+**Belirtiler:**  
+- Sunucu yavaş çalışıyor  
+- Update'ler gösterilmiyor  
+
+**Çözüm:**  
+```powershell
+# WSUS veritabanı temizleme
+wsusutil.exe deleteunneededrevisions
+
+# Veritabanı sıkıştırma
+$wsus = Get-WsusServer
+$database = $wsus.GetDatabase()
+$database.PerformMaintenance([Microsoft.UpdateServices.Administration.MaintenanceOperation]::CleanDatabase)
 ```
 
 ---
